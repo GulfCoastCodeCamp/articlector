@@ -13,22 +13,28 @@ namespace Zhresearches.Function
     public static class HttpTriggerCSharp
     {
         [FunctionName("HttpTriggerCSharp")]
-        [return:ServiceBus("myqueue-items",Connection="articlecollectors_SERVICEBUS")]
+        
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+            [HttpTrigger(AuthorizationLevel.Function,  "post", Route = null)] HttpRequest req,
+            ILogger log, [ServiceBus("myqueue-items",Connection="articlecollectors_SERVICEBUS")] ICollector<Article> queueCollector )
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
             string name = req.Query["name"];
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            name = name ?? data?.name;
-
-            return name != null
-                ? (ActionResult)new OkObjectResult($"Hello, {name}")
-                : new BadRequestObjectResult("Please pass a name on the query string or in the request body");
+            Article data = JsonConvert.DeserializeObject<Article>(requestBody);
+           
+            data.CreateTime = DateTimeOffset.Now;
+            queueCollector.Add(data);
+           return new OkResult();
         }
+    }
+
+    public class Article{
+        public DateTimeOffset  CreateTime { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public string Link { get; set; } 
     }
 }
